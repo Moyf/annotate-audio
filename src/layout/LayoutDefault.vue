@@ -1,5 +1,6 @@
 <template>
 	<div class="layout--default">
+		<!-- Sticky Container -->
 		<div
 			ref="stickyContainer"
 			:class="['main-container', options.sticky && 'is-sticky']"
@@ -7,12 +8,13 @@
 			<div :class="['inputs-container']">
 				<!-- Player Controls -->
 				<div :class="['controls-container']">
-					<!-- Play/Pause Control -->
-					<div
+					<!-- Play/Pause -->
+					<button
+						type="button"
 						ref="playpause_btn"
 						:class="[
 							'playpause_btn',
-							sharedRefs.isCommentInputShown.value &&
+							sharedRefs.isCommentInputShown &&
 								!options.unstoppable &&
 								'disabled',
 						]"
@@ -24,17 +26,19 @@
 								sharedRefs.currentTime
 							)
 						"
-					></div>
+					></button>
 					<!-- Movement Controls -->
 					<div
 						:class="[
 							'movement-container',
-							sharedRefs.isCommentInputShown.value &&
+							sharedRefs.isCommentInputShown &&
 								!options.unstoppable &&
 								'disabled',
 						]"
 					>
-						<div
+						<!-- Backward -->
+						<button
+							type="button"
 							ref="backward_btn"
 							:class="['movement-btn']"
 							@click="
@@ -42,11 +46,13 @@
 									player,
 									options.chunk,
 									sharedRefs.currentTime,
-									sharedRefs.currentTime.value - 5
+									sharedRefs.currentTime - 5
 								)
 							"
-						></div>
-						<div
+						></button>
+						<!-- Forward -->
+						<button
+							type="button"
 							ref="forward_btn"
 							:class="['movement-btn']"
 							@click="
@@ -54,35 +60,22 @@
 									player,
 									options.chunk,
 									sharedRefs.currentTime,
-									sharedRefs.currentTime.value + 5
+									sharedRefs.currentTime + 5
 								)
 							"
-						></div>
+						></button>
 					</div>
 				</div>
 				<!-- TimeLine Numbers -->
 				<div :class="['timeline-numbers']">
-					<span>{{
-						displayCurrentTime(
-							sharedRefs.currentTime.value,
-							sharedRefs.maxDuration.value
-						)
-					}}</span>
-					<span
-						>-
-						{{
-							displayDuration(
-								options.chunk,
-								sharedRefs.maxDuration.value
-							)
-						}}</span
-					>
+					<span>{{ displayCurrentTime }}</span>
+					<span>- {{ displayDuration }}</span>
 				</div>
 				<!-- Timeline -->
 				<div
 					:class="[
 						'timeline-container',
-						sharedRefs.isCommentInputShown.value && 'disabled',
+						sharedRefs.isCommentInputShown && 'disabled',
 					]"
 				>
 					<input
@@ -90,7 +83,7 @@
 						:min="options.chunk?.startTime"
 						:max="options.chunk?.endTime"
 						step="0.1"
-						v-model="sharedRefs.currentTime.value"
+						v-model="sharedRefs.currentTime"
 						@input="eventTimeBarInput"
 					/>
 				</div>
@@ -98,33 +91,35 @@
 				<div
 					:class="[
 						'stacked-btns-container',
-						sharedRefs.isCommentInputShown.value && 'disabled',
+						sharedRefs.isCommentInputShown && 'disabled',
 					]"
 				>
 					<!-- "Properies" Button-->
-					<div
-						ref="showProperties_btn"
-						:class="['showProperties_btn']"
+					<button
+						type="button"
+						ref="openProperties_btn"
+						:class="['openProperties_btn']"
 						@click="
 							pausePlayer(player, sharedRefs.currentTime);
 							new PropertiesModal(
+								options,
 								source,
 								ctx,
 								container,
 								obsidianApp,
-								sharedRefs.maxDuration.value!
+								sharedRefs.maxDuration!
 							).openPropertiesModal();
 						"
-					></div>
+					></button>
 					<!-- "Add Comment" Button -->
-					<div
+					<button
 						ref="showCommentInput_btn"
 						:class="[
 							'commentInput_btn',
-							sharedRefs.isCommentInputShown.value && 'disabled',
+							sharedRefs.isCommentInputShown && 'disabled',
 						]"
-						@click="sharedRefs.isCommentInputShown.value = true"
-					></div>
+						@click="sharedRefs.isCommentInputShown = true"
+					></button>
 				</div>
 			</div>
 
@@ -134,7 +129,6 @@
 				:source="source"
 				:container="container"
 				:ctx="ctx"
-				:audioSource="audioSource"
 				:player="player"
 				:obsidianApp="obsidianApp"
 				:sharedRefs="sharedRefs"
@@ -143,12 +137,9 @@
 		</div>
 
 		<!-- Comments List -->
-		<CommentList
+		<CommentsList
 			:id="id"
 			:source="source"
-			:container="container"
-			:ctx="ctx"
-			:audioSource="audioSource"
 			:player="player"
 			:obsidianApp="obsidianApp"
 			:sharedRefs="sharedRefs"
@@ -158,73 +149,79 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { MarkdownPostProcessorContext, App, setIcon } from "obsidian";
 // Import - Component
-import CommentInput from "../Comment/CommentInput.vue";
-import CommentList from "../Comment/CommentList.vue";
-// Import - Func
-import { displayCurrentTime, displayDuration } from "./LayoutSharedFunc";
-import {
-	togglePlayer,
-	setPlayerPosition,
-	pausePlayer,
-} from "../Logic/playerFunc";
-import { logRefs } from "../sharedFunc";
+import CommentInput from "../comment/CommentInput.vue";
+import CommentsList from "../comment/CommentsList.vue";
 // Import - Type
-import type { SharedRefs } from "../sharedRefs";
+import type { SharedRefs } from "src/types";
+import type { AudioBoxOptions } from "src/options/optionsType";
 // Import - Class
-import { AudioBoxOptions, PropertiesModal } from "src/options";
+import { PropertiesModal } from "src/options/optionsModal";
+// Import - Functions
+import { togglePlayer, setPlayerPosition, pausePlayer } from "../playerLogic";
+import { initIcon, secondsToTime } from "src/utils";
 
 const props = defineProps<{
 	id: string;
 	source: string;
 	container: HTMLElement;
 	ctx: MarkdownPostProcessorContext;
-	audioSource: string;
 	player: HTMLAudioElement;
 	obsidianApp: App;
 	sharedRefs: SharedRefs;
 	options: AudioBoxOptions;
 }>();
 
-// UI
-const playpause_btn = ref<HTMLElement | null>(null);
-const showCommentInput_btn = ref<HTMLElement | null>(null);
-const showProperties_btn = ref<HTMLElement | null>(null);
-const backward_btn = ref<HTMLElement | null>(null);
-const forward_btn = ref<HTMLElement | null>(null);
-
 /* ----------------- */
 /* --- Lifecycle --- */
 /* ----------------- */
 
-onMounted(() => {
-	// Initialize icons
-	if (playpause_btn.value) setIcon(playpause_btn.value, "play");
-	if (showCommentInput_btn.value)
-		setIcon(showCommentInput_btn.value, "bookmark-plus");
-	if (showProperties_btn.value)
-		setIcon(showProperties_btn.value, "settings-2");
-	if (backward_btn.value) setIcon(backward_btn.value, "chevrons-left");
-	if (forward_btn.value) setIcon(forward_btn.value, "chevrons-right");
+// UI
+const playpause_btn = ref<HTMLElement | null>(null);
+const showCommentInput_btn = ref<HTMLElement | null>(null);
+const openProperties_btn = ref<HTMLElement | null>(null);
+const backward_btn = ref<HTMLElement | null>(null);
+const forward_btn = ref<HTMLElement | null>(null);
 
-	// Initialize Event-Listeners
+onMounted(() => {
+	// Initialize - Icons
+	initIcon(playpause_btn.value, "play");
+	initIcon(showCommentInput_btn.value, "bookmark-plus");
+	initIcon(openProperties_btn.value, "settings-2");
+	initIcon(backward_btn.value, "chevrons-left");
+	initIcon(forward_btn.value, "chevrons-right");
+
+	// Initialize - Event-Listeners
 	if (props.player) {
 		props.player.addEventListener("timeupdate", eventTimeUpdate);
 		props.player.addEventListener("play", eventPlayerPlay);
 		props.player.addEventListener("pause", eventPlayerPause);
 	}
-
-	/* logRefs(props.sharedRefs); */
 });
 
 onBeforeUnmount(() => {
-	// Destroy Event-Listeners
+	// Destroy - Event-Listeners
 	props.player.removeEventListener("timeupdate", eventTimeUpdate);
 	props.player.removeEventListener("play", eventPlayerPlay);
 	props.player.removeEventListener("pause", eventPlayerPause);
 });
+
+/* ---------------- */
+/* --- Computed --- */
+/* ---------------- */
+
+const displayCurrentTime = computed(() =>
+	secondsToTime(
+		Math.floor(props.sharedRefs.currentTime),
+		props.sharedRefs.maxDuration
+	)
+);
+
+const displayDuration = computed(() =>
+	secondsToTime(props.options.chunk.endTime, props.sharedRefs.maxDuration)
+);
 
 /* ---------------- */
 /* --- Function --- */
@@ -235,26 +232,26 @@ onBeforeUnmount(() => {
 
 function eventTimeBarInput(): void {
 	// Validate and update the audio's current time
-	if (!isNaN(props.sharedRefs.currentTime.value) && props.player)
-		props.player.currentTime = props.sharedRefs.currentTime.value;
+	if (!isNaN(props.sharedRefs.currentTime) && props.player)
+		props.player.currentTime = props.sharedRefs.currentTime;
 }
 
 function eventTimeUpdate(): void {
-	// Update currentTime #TODO rendi > generico
-	props.sharedRefs.currentTime.value = props.player.currentTime;
+	// Update currentTime
+	props.sharedRefs.currentTime = props.player.currentTime;
 
 	// IF outside chunk, simulate the end
-	if (props.sharedRefs.currentTime.value > props.options.chunk?.endTime!)
+	if (props.sharedRefs.currentTime > props.options.chunk.endTime)
 		props.player.dispatchEvent(new Event("ended", { bubbles: true }));
 }
 
-function eventPlayerPlay(): void {
+function eventPlayerPlay() {
 	// Update icon
-	setIcon(playpause_btn.value!, "pause");
+	initIcon(playpause_btn.value, "pause");
 }
 
-function eventPlayerPause(): void {
+function eventPlayerPause() {
 	// Update icon
-	setIcon(playpause_btn.value!, "play");
+	initIcon(playpause_btn.value, "play");
 }
 </script>

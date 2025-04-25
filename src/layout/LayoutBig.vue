@@ -2,19 +2,17 @@
 	<div class="layout--big">
 		<!-- Title -->
 		<div v-show="title" :class="['audiobox-title']">
-			<span ref="titleIcon"></span>{{ title }}
+			<span ref="titleIcon"></span>
+			{{ title }}
 		</div>
 		<!-- WaveGraph -->
 		<div
-			:class="[
-				'wavegraph',
-				sharedRefs.isCommentInputShown.value && 'disabled',
-			]"
+			:class="['wavegraph', sharedRefs.isCommentInputShown && 'disabled']"
 		>
 			<div
 				v-for="(s, i) in barHeights"
 				:class="{ bar: true, playedBar: i <= currentBar }"
-				:key="props.sharedRefs.srcPath.value + i"
+				:key="props.sharedRefs.srcPath + i"
 				:style="{ height: s * 6 + 'rem' }"
 			></div>
 		</div>
@@ -26,7 +24,7 @@
 			<div
 				:class="[
 					'timeline-container',
-					sharedRefs.isCommentInputShown.value && 'disabled',
+					sharedRefs.isCommentInputShown && 'disabled',
 				]"
 			>
 				<input
@@ -34,43 +32,44 @@
 					:min="options.chunk?.startTime"
 					:max="options.chunk?.endTime"
 					step="0.1"
-					v-model="sharedRefs.currentTime.value"
+					v-model="sharedRefs.currentTime"
 					@input="eventTimeBarInput"
 				/>
 				<div :class="['timeline-numbers']">
-					<span>{{
-						displayCurrentTime(sharedRefs.currentTime.value)
-					}}</span>
-					<span>{{ displayDuration(options.chunk) }}</span>
+					<span>{{ displayCurrentTime }}</span>
+					<span>{{ displayDuration }}</span>
 				</div>
 			</div>
 			<!-- Controls -->
 			<div :class="['controls-container']">
 				<!-- Properies -->
-				<div
+				<button
+					type="button"
 					ref="showProperties_btn"
 					:class="[
 						'commentInput_btn',
 						'control_btn',
-						sharedRefs.isCommentInputShown.value && 'disabled',
+						sharedRefs.isCommentInputShown && 'disabled',
 					]"
 					@click="
 						pausePlayer(player, sharedRefs.currentTime);
 						new PropertiesModal(
+							options,
 							source,
 							ctx,
 							container,
 							obsidianApp,
-							sharedRefs.maxDuration.value!
+							sharedRefs.maxDuration!
 						).openPropertiesModal();
 					"
-				></div>
+				></button>
 				<!-- Backward -->
-				<div
+				<button
+					type="button"
 					:class="[
 						'control_btn',
 						'secondary_btn',
-						sharedRefs.isCommentInputShown.value &&
+						sharedRefs.isCommentInputShown &&
 							!options.unstoppable &&
 							'disabled',
 					]"
@@ -79,18 +78,19 @@
 							player,
 							options.chunk,
 							sharedRefs.currentTime,
-							sharedRefs.currentTime.value - 5
+							sharedRefs.currentTime - 5
 						)
 					"
 				>
 					-5s
-				</div>
+				</button>
 				<!-- Play/Pause -->
-				<div
+				<button
+					type="button"
 					ref="playpause_btn"
 					:class="[
 						'control_btn',
-						sharedRefs.isCommentInputShown.value &&
+						sharedRefs.isCommentInputShown &&
 							!options.unstoppable &&
 							'disabled',
 					]"
@@ -102,13 +102,13 @@
 							sharedRefs.currentTime
 						)
 					"
-				></div>
+				></button>
 				<!-- Forward -->
-				<div
+				<button
 					:class="[
 						'control_btn',
 						'secondary_btn',
-						sharedRefs.isCommentInputShown.value &&
+						sharedRefs.isCommentInputShown &&
 							!options.unstoppable &&
 							'disabled',
 					]"
@@ -117,22 +117,22 @@
 							player,
 							options.chunk,
 							sharedRefs.currentTime,
-							sharedRefs.currentTime.value + 5
+							sharedRefs.currentTime + 5
 						)
 					"
 				>
 					+5s
-				</div>
+				</button>
 				<!-- Add Comment -->
-				<div
+				<button
 					ref="showCommentInput_btn"
 					:class="[
 						'commentInput_btn',
 						'control_btn',
-						sharedRefs.isCommentInputShown.value && 'disabled',
+						sharedRefs.isCommentInputShown && 'disabled',
 					]"
-					@click="sharedRefs.isCommentInputShown.value = true"
-				></div>
+					@click="sharedRefs.isCommentInputShown = true"
+				></button>
 			</div>
 			<!-- Comment Input -->
 			<CommentInput
@@ -140,7 +140,6 @@
 				:source="source"
 				:container="container"
 				:ctx="ctx"
-				:audioSource="audioSource"
 				:player="player"
 				:obsidianApp="obsidianApp"
 				:sharedRefs="sharedRefs"
@@ -149,12 +148,9 @@
 		</div>
 
 		<!-- Comments List -->
-		<CommentList
+		<CommentsList
 			:id="id"
 			:source="source"
-			:container="container"
-			:ctx="ctx"
-			:audioSource="audioSource"
 			:player="player"
 			:obsidianApp="obsidianApp"
 			:sharedRefs="sharedRefs"
@@ -165,29 +161,20 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { MarkdownPostProcessorContext, App, setIcon, TFile } from "obsidian";
+import { MarkdownPostProcessorContext, App, TFile } from "obsidian";
 // Import - Component
-import CommentInput from "../Comment/CommentInput.vue";
-import CommentList from "../Comment/CommentList.vue";
-// Import - Class
-import { AudioBoxOptions, PropertiesModal } from "src/options";
-// Import - Func
-import {
-	displayCurrentTime,
-	displayTitle,
-	displayDuration,
-} from "./LayoutSharedFunc";
-import {
-	togglePlayer,
-	setPlayerPosition,
-	pausePlayer,
-} from "../Logic/playerFunc";
+import CommentInput from "../comment/CommentInput.vue";
+import CommentsList from "../comment/CommentsList.vue";
 // Import - Type
 import type { AudioChunk } from "src/types";
-import type { SharedRefs } from "../sharedRefs";
-import { logRefs } from "../sharedFunc";
-import { getAudioboxOptions } from "../Logic/codeblockFunc";
-import { hashObj } from "src/utils";
+import type { SharedRefs } from "src/types";
+import type { AudioBoxOptions } from "src/options/optionsType";
+// Import - Class
+import { PropertiesModal } from "src/options/optionsModal";
+// Import - Functions
+import { displayTitle } from "./layoutLogic";
+import { togglePlayer, setPlayerPosition, pausePlayer } from "../playerLogic";
+import { hashObj, initIcon, secondsToTime } from "src/utils";
 
 const props = defineProps<{
 	id: string;
@@ -201,45 +188,44 @@ const props = defineProps<{
 	options: AudioBoxOptions;
 }>();
 
-/* ------------ */
-/* --- Refs --- */
-/* ------------ */
+/* ----------------- */
+/* --- Lifecycle --- */
+/* ----------------- */
+
 // UI
 const titleIcon = ref<HTMLElement | null>(null);
 const playpause_btn = ref<HTMLElement | null>(null);
 const showCommentInput_btn = ref<HTMLElement | null>(null);
 const showProperties_btn = ref<HTMLElement | null>(null);
 // WaveGraph
-const nSamples = ref<number>(150); // N° of bars in WaveGraph
+const nSamples: number = 150; // N° of bars in WaveGraph
 const barHeights = ref<number[]>([]); // Height of the bars of the graph
-
-/* ----------------- */
-/* --- Lifecycle --- */
-/* ----------------- */
 
 onMounted(async () => {
 	// Initialize icons
-	if (titleIcon.value) setIcon(titleIcon.value, "audio-lines");
-	if (playpause_btn.value) setIcon(playpause_btn.value, "play");
-	if (showCommentInput_btn.value)
-		setIcon(showCommentInput_btn.value, "bookmark-plus");
-	if (showProperties_btn.value)
-		setIcon(showProperties_btn.value, "settings-2");
+	initIcon(titleIcon.value, "audio-lines");
+	initIcon(playpause_btn.value, "play");
+	initIcon(showCommentInput_btn.value, "bookmark-plus");
+	initIcon(showProperties_btn.value, "settings-2");
 
-	// Initialize Wavegraph #TODO poco elegante
-	const codeblockSettings = getAudioboxOptions(
-		props.source,
-		props.sharedRefs.maxDuration.value!
-	);
-	const newHash = await hashObj(codeblockSettings);
-	const oldHash = localStorage.getItem(`aa_${props.audioSource}_optionsHash`);
+	// Initialize Wavegraph
+	const newHash = await hashObj(props.options);
+	const oldHash = localStorage.getItem(`aa_${props.id}_optionsHash`);
 	if (newHash === oldHash) {
 		const cachedBarHeights = localStorage.getItem(
-			`aa_${props.audioSource}_barHeights`
+			`aa_${props.id}_barHeights`
 		);
-		if (cachedBarHeights) barHeights.value = JSON.parse(cachedBarHeights);
-		else barHeights.value = await calculateWaveGraph();
-	} else barHeights.value = await calculateWaveGraph();
+		if (cachedBarHeights) {
+			// Use cache
+			barHeights.value = JSON.parse(cachedBarHeights);
+		} else {
+			// Re-Calculate
+			barHeights.value = await calculateWaveGraph();
+		}
+	} else {
+		// Re-Calculate
+		barHeights.value = await calculateWaveGraph();
+	}
 
 	// Initialize Event-Listeners
 	if (props.player) {
@@ -247,8 +233,6 @@ onMounted(async () => {
 		props.player.addEventListener("play", eventPlayerPlay);
 		props.player.addEventListener("pause", eventPlayerPause);
 	}
-
-	/* logRefs(props.sharedRefs); */
 });
 
 onBeforeUnmount(() => {
@@ -257,22 +241,29 @@ onBeforeUnmount(() => {
 	props.player.removeEventListener("play", eventPlayerPlay);
 	props.player.removeEventListener("pause", eventPlayerPause);
 
-	// Save cache
-	localStorage.setItem(
-		`aa_${props.audioSource}_barHeights`,
-		JSON.stringify(barHeights.value)
-	);
+	saveCache();
 });
 
 /* ---------------- */
 /* --- Computed --- */
 /* ---------------- */
 
+const displayCurrentTime = computed(() =>
+	secondsToTime(
+		Math.floor(props.sharedRefs.currentTime),
+		props.sharedRefs.maxDuration
+	)
+);
+
+const displayDuration = computed(() =>
+	secondsToTime(props.options.chunk.endTime, props.sharedRefs.maxDuration)
+);
+
 const currentBar = computed(() => {
 	return Math.floor(
-		((props.sharedRefs.currentTime.value - props.options.chunk.startTime) /
+		((props.sharedRefs.currentTime - props.options.chunk.startTime) /
 			props.options.chunk.duration!) *
-			nSamples.value
+			nSamples
 	);
 });
 
@@ -307,10 +298,10 @@ async function calculateWaveGraph(): Promise<number[]> {
 				),
 			}; // Portion of audio to play (can be entire file)
 			const barWidth = Math.floor(
-				(playedChunk.endTime - playedChunk.startTime) / nSamples.value
+				(playedChunk.endTime - playedChunk.startTime) / nSamples
 			);
 			let highestBar = 0;
-			for (let i = 0; i < nSamples.value; i++) {
+			for (let i = 0; i < nSamples; i++) {
 				let blockStart = props.options.chunk?.startTime! + barWidth * i;
 				let sum = 0;
 				for (let j = 0; j < barWidth; j++) {
@@ -325,7 +316,16 @@ async function calculateWaveGraph(): Promise<number[]> {
 			return (barHeights.value = tempArray.map((x) => x / highestBar));
 		});
 	}
+
+	// Default result
 	return [];
+}
+
+function saveCache(): void {
+	localStorage.setItem(
+		`aa_${props.id}_barHeights`,
+		JSON.stringify(barHeights.value)
+	);
 }
 
 /* ------------------------- */
@@ -333,26 +333,26 @@ async function calculateWaveGraph(): Promise<number[]> {
 
 function eventTimeBarInput() {
 	// Validate and update the audio's current time
-	if (!isNaN(props.sharedRefs.currentTime.value) && props.player)
-		props.player.currentTime = props.sharedRefs.currentTime.value;
+	if (!isNaN(props.sharedRefs.currentTime) && props.player)
+		props.player.currentTime = props.sharedRefs.currentTime;
 }
 
 function eventTimeUpdate() {
-	// Update currentTime #TODO rendi > generico
-	props.sharedRefs.currentTime.value = props.player.currentTime;
+	// Update currentTime
+	props.sharedRefs.currentTime = props.player.currentTime;
 
 	// IF outside chunk, simulate the end
-	if (props.sharedRefs.currentTime.value > props.options.chunk?.endTime!)
+	if (props.sharedRefs.currentTime > props.options.chunk.endTime)
 		props.player.dispatchEvent(new Event("ended", { bubbles: true }));
 }
 
 function eventPlayerPlay() {
 	// Update icon
-	setIcon(playpause_btn.value!, "pause");
+	initIcon(playpause_btn.value, "pause");
 }
 
 function eventPlayerPause() {
 	// Update icon
-	setIcon(playpause_btn.value!, "play");
+	initIcon(playpause_btn.value, "play");
 }
 </script>

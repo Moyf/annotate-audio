@@ -1,8 +1,8 @@
 import { MarkdownRenderChild } from "obsidian";
 import { App, createApp } from "vue";
 // Import - Component
-import ParentApp from "./components/ParentApp.vue";
-import NotFoundApp from "./components/404.vue";
+import ParentApp from "./ParentApp.vue";
+import Layout404 from "./layout/Layout404.vue";
 // Import - Type
 import type { AudioBoxParameters } from "./types";
 
@@ -20,7 +20,7 @@ export class AudioBox extends MarkdownRenderChild {
 		this.audioboxId = options.id;
 
 		// Select who to render based on necessity
-		const selectedComponent = options.audioSource ? ParentApp : NotFoundApp;
+		const selectedComponent = options.audioSource ? ParentApp : Layout404;
 
 		this.vueApp = createApp(selectedComponent, {
 			id: options.id,
